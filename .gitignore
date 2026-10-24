@@ -5,3 +5,5 @@ examples/client/targets
 examples/client/metadata
 tsconfig.build.tsbuildinfo
 *.code-workspace
+
+.release/

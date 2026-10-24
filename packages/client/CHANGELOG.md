@@ -1,4 +1,13 @@
-# tuf-js
+# @stacksjs/tuf-js
+
+## 6.0.1
+
+### Patch Changes
+
+- Publish the maintained source client with awaited verified-metadata observation,
+  owned reference time and metadata bytes, and typed persistence/verification
+  failures. Preserve upstream MIT attribution and distribute the qualified package
+  through versioned GitHub release archives.
 
 ## 6.0.0
 

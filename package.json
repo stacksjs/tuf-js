@@ -13,7 +13,9 @@
     "prettier:check": "prettier --check packages/**/*.ts",
     "lint": "eslint --fix",
     "lint:check": "eslint --max-warnings 0",
-    "release": "npm run build && changeset publish"
+    "release": "npm run build && npm pack --workspace @stacksjs/tuf-js --pack-destination .release",
+    "prerelease": "node -e \"require('node:fs').mkdirSync('.release', { recursive: true })\"",
+    "release:patch": "changeset version && npm install --package-lock-only --ignore-scripts --lockfile-version=2 && npm run release"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

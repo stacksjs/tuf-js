@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { Updater } from 'tuf-js';
+import { Updater } from '@stacksjs/tuf-js';
 
 export default class DownloadTarget extends Command {
   static override aliases = ['download'];

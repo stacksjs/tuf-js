@@ -1,7 +1,7 @@
 {
-  "name": "tuf-js",
-  "version": "6.0.0",
-  "description": "JavaScript implementation of The Update Framework (TUF)",
+  "name": "@stacksjs/tuf-js",
+  "version": "6.0.1",
+  "description": "Stacks-maintained TUF client with verified metadata observation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -11,7 +11,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/theupdateframework/tuf-js.git"
+    "url": "git+https://github.com/stacksjs/tuf-js.git",
+    "directory": "packages/client"
   },
   "files": [
     "dist"
@@ -24,9 +25,9 @@
   "author": "bdehamer@github.com",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/theupdateframework/tuf-js/issues"
+    "url": "https://github.com/stacksjs/tuf-js/issues"
   },
-  "homepage": "https://github.com/theupdateframework/tuf-js/tree/main/packages/client#readme",
+  "homepage": "https://github.com/stacksjs/tuf-js/tree/main/packages/client#readme",
   "devDependencies": {
     "@tufjs/repo-mock": "5.0.0",
     "@types/debug": "^4.1.13",

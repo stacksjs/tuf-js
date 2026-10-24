@@ -1,38 +1,80 @@
-name: Release
+name: SDK source release
 
 on:
   push:
-    branches:
-      - main
+    tags: ['sdk-v*']
 
 permissions:
   contents: read
 
 jobs:
   release:
-    name: Release packages
+    name: Qualify and publish maintained client archive
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
-      id-token: write
     steps:
-      - name: Checkout source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v3
-
-      - name: Setup node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v3
+      - name: Checkout exact release source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          node-version: 24.x
-          registry-url: 'https://registry.npmjs.org'
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install frozen dependencies
+        run: npm ci --ignore-scripts
 
-      - name: Create Release Pull Request
-        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
-        with:
-          publish: npm run release
+      - name: Build and pack maintained client
+        run: npm run release
+
+      - name: Test exact source
+        run: npm run test:ci
+
+      - name: Lint source
+        run: npm run lint:check
+
+      - name: Check formatting
+        run: npm run prettier:check
+
+      - name: Verify release identity and record archive integrity
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const pkg = JSON.parse(readFileSync('packages/client/package.json', 'utf8'));
+          assert.equal(pkg.name, '@stacksjs/tuf-js');
+          assert.equal(process.env.RELEASE_TAG, `sdk-v${pkg.version}`);
+          execFileSync('git', ['diff', '--exit-code']);
+          execFileSync('git', ['diff', '--cached', '--exit-code']);
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          execFileSync('git', ['merge-base', '--is-ancestor', commit, 'origin/main']);
+          const archive = `stacksjs-tuf-js-${pkg.version}.tgz`;
+          assert.deepEqual(readdirSync('.release').filter(name => name.endsWith('.tgz')), [archive]);
+          const bytes = readFileSync(`.release/${archive}`);
+          const sha512 = createHash('sha512').update(bytes).digest('hex');
+          const sha256 = createHash('sha256').update(bytes).digest('hex');
+          writeFileSync('.release/SHA512SUMS', `${sha512}  ${archive}\n`);
+          writeFileSync('.release/source.json', JSON.stringify({
+            package: pkg.name, version: pkg.version,
+            repository: 'https://github.com/stacksjs/tuf-js',
+            commit, tag: process.env.RELEASE_TAG, archive, sha512, sha256,
+            distribution: 'GitHub release archive; not an upstream npm publication',
+          }, null, 2) + '\n');
+          writeFileSync('.release/notes.md', `Maintained source client ${pkg.name}@${pkg.version}.\n\nSource commit: ${commit}.\n\nThe archive includes the upstream MIT license. Verify SHA512SUMS and retain the frozen application lockfile. This is a maintained fork, not an upstream npm release.\n`);
+          NODE
+
+      - name: Publish source release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" .release/*.tgz .release/SHA512SUMS .release/source.json \
+            --verify-tag --title "@stacksjs/tuf-js $RELEASE_TAG" --notes-file .release/notes.md

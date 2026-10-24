@@ -1,3 +1,16 @@
+# Stacks-maintained TUF client
+
+This repository maintains the `@stacksjs/tuf-js` source client and its verified
+metadata observation extensions. The source is forked from
+[theupdateframework/tuf-js](https://github.com/theupdateframework/tuf-js), with
+its original MIT attribution retained. See the [client documentation](packages/client/README.md)
+for the extension contract and versioned GitHub release distribution.
+
+The remaining workspace packages support source development and conformance
+checks. They are not published by this fork's SDK release workflow. The original
+upstream project overview follows for context; its maintainers do not maintain
+or endorse these fork-specific extensions.
+
 # <img src="https://cdn.rawgit.com/theupdateframework/artwork/3a649fa6/tuf-logo.svg" height="100" valign="middle" alt="TUF"/> A Framework for Securing Software Update Systems
 
 [![npm version](https://img.shields.io/npm/v/tuf-js.svg?style=flat)](https://www.npmjs.com/package/tuf-js) [![CI Status](https://github.com/theupdateframework/tuf-js/workflows/CI/badge.svg)](https://github.com/theupdateframework/tuf-js/actions/workflows/ci.yml) [![Smoke test](https://github.com/theupdateframework/tuf-js/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/theupdateframework/tuf-js/actions/workflows/smoke-test.yml) [![Conformance](https://github.com/theupdateframework/tuf-js/actions/workflows/conformance.yml/badge.svg)](https://github.com/theupdateframework/tuf-js/actions/workflows/conformance.yml)
@@ -43,12 +56,12 @@ Please see [TUF's website](https://theupdateframework.com/) for more information
 
 ## License
 
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE.md) for the full terms.
+This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE) for the full terms.
 
 ## Code of Conduct
 
 Please note that this project is released with a [Contributor Code of Conduct](./CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
 
-## Maintainers
+## Upstream maintainers
 
 `tuf-js` is maintained by [@ejahnGithub](https://github.com/ejahnGithub) and [@bdehamer](https://github.com/bdehamer) on the Package Security team at GitHub.
