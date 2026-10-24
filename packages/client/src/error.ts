@@ -10,6 +10,16 @@ export class PersistError extends Error {}
 // looking from the perspective of users of metadata API or ngclient.
 export class RepositoryError extends Error {}
 
+export class MetadataVerificationError extends Error {
+  constructor(
+    readonly role: string,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+  }
+}
+
 // An error for metadata that contains an invalid version number.
 export class BadVersionError extends RepositoryError {}
 

@@ -7,6 +7,7 @@ import { Config, defaultConfig } from './config';
 import {
   DownloadHTTPError,
   EqualVersionError,
+  MetadataVerificationError,
   PersistError,
   RuntimeError,
   ValueError,
@@ -23,6 +24,10 @@ export interface UpdaterOptions {
   fetcher?: Fetcher;
   forceCache?: boolean;
   config?: Partial<Config>;
+  /** Awaited after verification and before cache persistence. Receives an owned copy. */
+  onVerifiedMetadata?: (role: string, bytes: Buffer) => void | Promise<void>;
+  /** Copied fixed start time for recovery replay, not a trusted clock source. */
+  referenceTime?: Date;
 }
 
 const log = debug('tuf:cache');
@@ -41,6 +46,7 @@ export class Updater {
   private trustedSet: TrustedMetadataStore;
   private config: Config;
   private fetcher: Fetcher;
+  private onVerifiedMetadata?: UpdaterOptions['onVerifiedMetadata'];
 
   constructor(options: UpdaterOptions) {
     const {
@@ -59,9 +65,26 @@ export class Updater {
     this.targetBaseUrl = targetBaseUrl;
     this.forceCache = options.forceCache ?? false;
 
+    const referenceTime = options.referenceTime ?? new Date();
+    if (
+      !(referenceTime instanceof Date) ||
+      !Number.isFinite(referenceTime.getTime())
+    ) {
+      throw new ValueError('Invalid fixed update reference time');
+    }
+    if (
+      options.onVerifiedMetadata !== undefined &&
+      typeof options.onVerifiedMetadata !== 'function'
+    ) {
+      throw new ValueError('Invalid verified metadata observer');
+    }
+    this.onVerifiedMetadata = options.onVerifiedMetadata;
     const data = this.loadLocalMetadata(MetadataKind.Root);
 
-    this.trustedSet = new TrustedMetadataStore(data);
+    this.trustedSet = new TrustedMetadataStore(
+      data,
+      new Date(referenceTime.getTime())
+    );
     this.config = { ...defaultConfig, ...config };
     const userAgent = config?.userAgent
       ? `${config.userAgent} tuf-js/${version}`
@@ -89,6 +112,10 @@ export class Updater {
       try {
         await this.loadTimestamp({ checkRemote: false });
       } catch (error) {
+        // A failed observer or cache write is not a cache miss.
+        if (error instanceof PersistError) {
+          throw error;
+        }
         await this.loadRoot();
         await this.loadTimestamp();
       }
@@ -202,10 +229,12 @@ export class Updater {
         );
 
         // Client workflow 5.3.4 - 5.4.7
-        this.trustedSet.updateRoot(bytesData);
+        this.verifyMetadata(MetadataKind.Root, () =>
+          this.trustedSet.updateRoot(bytesData)
+        );
 
         // Client workflow 5.3.8: persist root metadata file
-        this.persistMetadata(MetadataKind.Root, bytesData);
+        await this.persistMetadata(MetadataKind.Root, bytesData);
       } catch (error) {
         if (error instanceof DownloadHTTPError) {
           //  404/403 means current root is newest available
@@ -249,7 +278,9 @@ export class Updater {
 
     try {
       // Client workflow 5.4.2 - 5.4.4
-      this.trustedSet.updateTimestamp(bytesData);
+      this.verifyMetadata(MetadataKind.Timestamp, () =>
+        this.trustedSet.updateTimestamp(bytesData)
+      );
     } catch (error) {
       // If new timestamp version is same as current, discardd the new one.
       // This is normal and should NOT raise an error.
@@ -262,7 +293,7 @@ export class Updater {
     }
 
     // Client workflow 5.4.5: persist timestamp metadata
-    this.persistMetadata(MetadataKind.Timestamp, bytesData);
+    await this.persistMetadata(MetadataKind.Timestamp, bytesData);
   }
 
   // Load local and remote snapshot metadata.
@@ -297,14 +328,16 @@ export class Updater {
         );
 
         // Client workflow 5.5.2 - 5.5.6
-        this.trustedSet.updateSnapshot(bytesData);
+        this.verifyMetadata(MetadataKind.Snapshot, () =>
+          this.trustedSet.updateSnapshot(bytesData)
+        );
 
         // Client workflow 5.5.7: persist snapshot metadata file
-        this.persistMetadata(MetadataKind.Snapshot, bytesData);
+        await this.persistMetadata(MetadataKind.Snapshot, bytesData);
       } catch (error) {
-        throw new RuntimeError(
-          `Unable to load snapshot metadata error ${error}`
-        );
+        throw new RuntimeError('Unable to load snapshot metadata', {
+          cause: error,
+        });
       }
     }
   }
@@ -351,12 +384,16 @@ export class Updater {
         );
 
         // Client workflow 5.6.2 - 5.6.6
-        this.trustedSet.updateDelegatedTargets(bytesData, role, parentRole);
+        this.verifyMetadata(role, () =>
+          this.trustedSet.updateDelegatedTargets(bytesData, role, parentRole)
+        );
 
         // Client workflow 5.6.7: persist targets metadata file
-        this.persistMetadata(role, bytesData);
+        await this.persistMetadata(role, bytesData);
       } catch (error) {
-        throw new RuntimeError(`Unable to load targets error ${error}`);
+        throw new RuntimeError('Unable to load targets metadata', {
+          cause: error,
+        });
       }
     }
     return this.trustedSet.getRole(role);
@@ -445,16 +482,34 @@ export class Updater {
     return path.join(this.targetDir, filePath);
   }
 
-  private persistMetadata(metaDataName: string, bytesData: Buffer) {
+  private verifyMetadata<T>(role: string, operation: () => T): T {
+    try {
+      return operation();
+    } catch (error) {
+      if (error instanceof EqualVersionError) {
+        throw error;
+      }
+      throw new MetadataVerificationError(
+        role,
+        `Failed to verify metadata ${encodeURIComponent(role)}`,
+        { cause: error }
+      );
+    }
+  }
+
+  private async persistMetadata(metaDataName: string, bytesData: Buffer) {
     const encodedName = encodeURIComponent(metaDataName);
     try {
+      if (this.onVerifiedMetadata) {
+        await this.onVerifiedMetadata(metaDataName, Buffer.from(bytesData));
+      }
       const filePath = path.join(this.dir, `${encodedName}.json`);
       log('WRITE %s', filePath);
       fs.writeFileSync(filePath, bytesData.toString('utf8'));
     } catch (error) {
-      throw new PersistError(
-        `Failed to persist metadata ${encodedName} error: ${error}`
-      );
+      throw new PersistError(`Failed to persist metadata ${encodedName}`, {
+        cause: error,
+      });
     }
   }
 }

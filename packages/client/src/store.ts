@@ -25,9 +25,9 @@ export class TrustedMetadataStore {
   private trustedSet: TrustedSet = {};
   private referenceTime: Date;
 
-  constructor(rootData: Buffer) {
+  constructor(rootData: Buffer, referenceTime = new Date()) {
     // Client workflow 5.1: record fixed update start time
-    this.referenceTime = new Date();
+    this.referenceTime = new Date(referenceTime.getTime());
 
     // Client workflow 5.2: load trusted root metadata
     this.loadTrustedRoot(rootData);

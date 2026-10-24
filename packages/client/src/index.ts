@@ -5,3 +5,10 @@ export { Updater } from './updater';
 export type { Config } from './config';
 export type { Fetcher } from './fetcher';
 export type { UpdaterOptions } from './updater';
+
+export {
+  DownloadError,
+  DownloadHTTPError,
+  MetadataVerificationError,
+  PersistError,
+} from './error';

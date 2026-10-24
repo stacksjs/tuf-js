@@ -4,6 +4,7 @@ import fs from 'fs';
 import nock from 'nock';
 import os from 'os';
 import path from 'path';
+import { MetadataVerificationError } from '../src/error';
 import { Updater, UpdaterOptions } from '../src/updater';
 
 describe('Updater', () => {
@@ -91,9 +92,15 @@ describe('Updater', () => {
         nock(baseURL).get('/metadata/2.root.json').reply(200, {});
       });
 
-      it('resolves with no error', async () => {
+      it('rejects with the verified role and original validation cause', async () => {
         const updater = new Updater(options);
-        await expect(updater.refresh()).rejects.toThrow(TypeError);
+        const refresh = updater.refresh();
+        await expect(refresh).rejects.toBeInstanceOf(MetadataVerificationError);
+        await expect(refresh).rejects.toHaveProperty('role', 'root');
+        await expect(refresh).rejects.toHaveProperty(
+          'cause',
+          expect.any(TypeError)
+        );
       });
     });
   });
